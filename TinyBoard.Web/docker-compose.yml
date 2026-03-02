@@ -1,0 +1,37 @@
+services:
+  db:
+    image: postgres:16
+    container_name: tinyboard-db
+    environment:
+      POSTGRES_DB: tinyboard
+      POSTGRES_USER: tinyboard
+      POSTGRES_PASSWORD: tinyboard
+    ports:
+      - "5433:5432"
+    volumes:
+      - tinyboard_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tinyboard -d tinyboard"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: tinyboard-web
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ConnectionStrings__Default: "Host=db;Port=5432;Database=tinyboard;Username=tinyboard;Password=tinyboard"
+      ASPNETCORE_ENVIRONMENT: "Development"
+      ASPNETCORE_URLS: "http://+:8080"
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+volumes:
+  tinyboard_pgdata:

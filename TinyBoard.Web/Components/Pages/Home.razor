@@ -1,0 +1,124 @@
+﻿@page "/"
+@rendermode InteractiveServer
+@using TinyBoard.Web.Models
+@inject Services.CardService CardsSvc
+
+<h1>TinyBoard</h1>
+
+<div style="max-width: 900px; margin-top: 16px;">
+    <EditForm EditContext="_createContext" FormName="create-card">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <div style="display:flex; gap:8px; align-items:flex-start;">
+            <div style="flex:1;">
+                <label>Title</label><br />
+                <InputText @bind-Value="_newCard.Title"
+                            style="width:100%;" />
+                <ValidationMessage For="@(() => _newCard.Title)" />
+            </div>
+
+            <div style="flex:2;">
+                <label>Notes</label><br />
+                <InputTextArea @bind-Value="_newCard.Notes"
+                               style="width:100%; height: 60px;" />
+            </div>
+
+            <div style="padding-top: 22px;">
+                <button type="button" @onclick="CreateCardClicked">Add</button>
+            </div>
+        </div>
+    </EditForm>
+</div>
+
+<hr />
+
+<div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; max-width: 900px;">
+    @Column(CardStatus.ToDo, "To Do")
+    @Column(CardStatus.Doing, "Doing")
+    @Column(CardStatus.Done, "Done")
+</div>
+
+@code {
+    private List<CardItem> _cards = new();
+
+    private CardItem _newCard = new();
+    private EditContext _createContext = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _createContext = new EditContext(_newCard);
+        await Reload();
+    }
+
+    private async Task Reload()
+    {
+        _cards = await CardsSvc.GetAllAsync();
+    }
+
+    private RenderFragment Column(CardStatus status, string title) => @<div style="border:1px solid #ddd; border-radius:8px; padding:12px;">
+        <h3>@title</h3>
+
+        @foreach (var c in _cards.Where(x => x.Status == status))
+        {
+            <div style="border:1px solid #eee; border-radius:8px; padding:10px; margin:10px 0;">
+                <div style="font-weight:600;">@c.Title</div>
+
+                @if (!string.IsNullOrWhiteSpace(c.Notes))
+                {
+                    <div style="margin-top:6px; white-space:pre-wrap;">@c.Notes</div>
+                }
+
+                <div style="display:flex; gap:8px; margin-top:10px; align-items:center;">
+                    <label>Status:</label>
+
+                    <select value="@((int)c.Status)" @onchange="(e) => ChangeStatus(c, e)">
+                        <option value="@((int)CardStatus.ToDo)">To Do</option>
+                        <option value="@((int)CardStatus.Doing)">Doing</option>
+                        <option value="@((int)CardStatus.Done)">Done</option>
+                    </select>
+
+                    <button style="margin-left:auto;" type="button" @onclick="() => Delete(c.Id)">
+                        Delete
+                    </button>
+                </div>
+            </div>
+        }
+
+        @if (!_cards.Any(x => x.Status == status))
+        {
+            <div style="color:#777; font-style:italic;">No cards</div>
+        }
+    </div>;
+
+    private async Task CreateCardClicked()
+    {
+        if (!_createContext.Validate())
+            return;
+
+        _newCard.Status = CardStatus.ToDo;
+        await CardsSvc.AddAsync(_newCard);
+
+        _newCard = new CardItem();
+        _createContext = new EditContext(_newCard);
+
+        await Reload();
+    }
+
+    private async Task ChangeStatus(CardItem card, ChangeEventArgs e)
+    {
+        if (e.Value is null) return;
+        if (!int.TryParse(e.Value.ToString(), out var val)) return;
+
+        card.Status = (CardStatus)val;
+
+        await CardsSvc.UpdateAsync(card);
+        await Reload();
+    }
+
+    private async Task Delete(Guid id)
+    {
+        await CardsSvc.DeleteAsync(id);
+        await Reload();
+    }
+}
