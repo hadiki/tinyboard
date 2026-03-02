@@ -10,3 +10,6 @@ cat > .gitignore << 'EOF'
 # OS
 .DS_Store
 EOF
+
+# JetBrains Rider build host artifacts
+BuildHost-*/
